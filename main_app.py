@@ -75,7 +75,9 @@ TRANS = {
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message, state: FSMContext):
     if db.check_subjects(message.from_user.id):
-        await message.answer(f"Твои возможности:", reply_markup=keyboards.main_menu_keyboard)
+        await message.answer("""🎓 Ваш персональный помощник в мире образования
+
+Telegram-бот  "Онлайн Поступишка" создан специально для тех, кто стоит перед важным выбором – поступление в университет. Мы понимаем, что этот процесс может быть пугающим и запутанным, поэтому разработали уникального помощника!\n\nНаш сайт - http://online-postupishka.netlify.app""", reply_markup=keyboards.main_menu_keyboard)
         return await state.set_state(botstates.MainMenuStates.main)
     first_name = message.from_user.first_name
     await message.answer("Привет! Я — твой помощник в выборе вуза и подготовке к экзаменам. Давай начнём с короткой анкеты, чтобы я понял, как тебе помочь! 🎓\n\n Какие предметы ты сдаёшь? Когда выберешь, нажми 'Я выбрал'", reply_markup=keyboards.create_subjects())
@@ -194,6 +196,7 @@ async def main_menu(message: types.Message, state: FSMContext):
 
 @dp.message(botstates.MainMenuStates.daily_help)
 async def get_daily_help(message: types.Message, state: FSMContext):
+    await state.set_state(botstates.Wait.wait_generation)
     await message.answer("Подожди ответа ИИ")
     aiDaily = await Analyzer().init("Представь, что ты школьный преподаватель и должен составить мне расписание обучения. Я учусь в школе до определённого времени каждый день, но мне надо готовиться к экзаменами. Я укажу сколько часов мне на это требуется за неделю. Твоя задача распределить. Также я ложусь в определённое время и трачу определённое время на дорогу домой. ",base=False)
     answer = await aiDaily.question(message.text)
@@ -234,7 +237,7 @@ async def rus_orfoepia_test(message: types.Message, state: FSMContext):
     await state.update_data(data)
     
 
-@dp.message(botstates.Choice.q) 
+@dp.message(botstates.Wait.wait_generation) 
 async def choice1(message: types.Message, state: FSMContext):
     return await message.answer("Ожидайте завершения генерации ответа")
 
@@ -281,11 +284,11 @@ async def psycho(message: types.Message, state: FSMContext):
     else:
         await state.set_state(botstates.Wait.wait_generation)
         msg = await message.answer("Обдумываю ваш запрос. . .")
-        await state.set_state(botstates.MainMenuStates.psycho)
         try:
             await msg.edit_text(await psycho_ai[message.from_user.id].user_ask(message.text))
         except:
             await message.answer("Ваш запрос не прошёл цензуру, простите")
+        await state.set_state(botstates.MainMenuStates.psycho)
 
 
 
