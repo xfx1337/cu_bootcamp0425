@@ -8,11 +8,11 @@ class RegistrationStates(StatesGroup):
 class MainMenuStates(StatesGroup):
     main = State()
     psycho = State()
+    tests = State()
 
 class Choice(StatesGroup):
-    q1 = State()
-    q2 = State()
-    q3 = State()
-    q4 = State()
-    q5 = State()
+    q = State()
     AskAI = State()
+
+class Tests(StatesGroup):
+    rus_orfoepia = State()

@@ -45,7 +45,7 @@ def user_exists(userid):
     cursor = conn.cursor()
     cursor.execute(
         "SELECT * FROM users WHERE userid = ?",
-        [(userid)]
+        (userid,)
     )
     result = cursor.fetchone()
     conn.close()
@@ -65,9 +65,34 @@ def register_user(userid, first_name):
 def register_subjects(userid, subjects):
     if user_exists(userid):
         conn = get_db_connection()
+        conn.execute("DELETE FROM subjects WHERE userid=?", (userid,))
         for s in subjects:
             conn.execute(
                 "INSERT INTO subjects (userid, subject) VALUES (?,?)",
             (userid, str(s)))
         conn.commit()
         conn.close()
+
+def check_subjects(user_id):
+    if user_exists(user_id):
+        conn = get_db_connection()
+        temp = conn.execute("SELECT * FROM subjects WHERE userid=?", (user_id,))
+        result = temp.fetchone()
+        conn.close()
+        return True if result else False
+    
+def get_subjects(user_id):
+    if user_exists(user_id):
+        conn = get_db_connection()
+        temp = conn.execute("SELECT subject FROM subjects WHERE userid=?", (user_id,))
+        results = temp.fetchall()
+        conn.close()
+        return results
+    
+def delete_subjects(user_id):
+    if user_exists(user_id):
+        conn = get_db_connection()
+        conn.execute("DELETE FROM subjects WHERE userid=?", (user_id,))
+        conn.commit()
+        conn.close()
+        return True

@@ -3,13 +3,23 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 
 main_menu_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="Тренажёры🔒"), KeyboardButton(text="Помощь с составлением расписания🔒")],
+        [KeyboardButton(text="Тренажёры🚀"), KeyboardButton(text="Помощь с составлением расписания🔒")],
         [KeyboardButton(text="Психолог👩🏻‍⚕️"), KeyboardButton(text="Помощь с выбором специальности✅")],
         [KeyboardButton(text="Помощь с расписанием🔒"), KeyboardButton(text="Аккаунт💳")]
     ],
     resize_keyboard=True,
     one_time_keyboard=True
 )
+
+tests_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Орфоэпия"), KeyboardButton(text="Орфография🔒")],
+        [KeyboardButton(text="Банк заданий Математика🔒"), KeyboardButton(text="Банк заданий Информатика🔒")],
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
 def create_subjects(data=[]):
     test = {
         "russian": "Русский язык",
@@ -29,7 +39,7 @@ def create_subjects(data=[]):
     keyboard = []
     for callback, text in test.items():
         if callback in data:
-            keyboard.append(InlineKeyboardButton(text="🟢" + text, callback_data='yes'))
+            keyboard.append(InlineKeyboardButton(text="🟢" + text, callback_data=callback))
         else:
             keyboard.append(InlineKeyboardButton(text=text, callback_data=callback))
     
@@ -45,6 +55,8 @@ def create_subjects(data=[]):
     subjects = InlineKeyboardMarkup(
         inline_keyboard=keyboard_final,
         resize_keyboard=True,
-        one_time_keyboard=True
     )
     return subjects
+
+profile = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="♻️Сменить предметы", callback_data="edit_subjects")]])

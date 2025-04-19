@@ -16,6 +16,9 @@ import botstates
 import keyboards
 from ai.yandex_ai import Psychologist, Analyzer
 
+import test_utils
+
+
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 admin_chat_id = os.getenv("ADMIN_CHAT_ID")
@@ -24,16 +27,38 @@ if not BOT_TOKEN:
 
 from create_bot import bot, dp
 
-psycho_ai = Psychologist()
-ai = Analyzer("Ты — помощник по выбору вуза. Помоги с выбором специальности")
+psycho_ai = {}
+ai = {}
+ask_answers = {}
+async def create_physicol(user_id):
+    global psycho_ai
+    if user_id in psycho_ai:
+        psycho_ai[user_id].clear()
+        return
+    psycho_ai[user_id] = Psychologist()
+    psycho_ai[user_id] = await psycho_ai[user_id].init()
+
+async def create_ai(user_id):
+    global ai
+    if user_id in ai:
+        ai[user_id].clear()
+        return
+    ai[user_id] = await Analyzer().init("""Ты — виртуальный консультант по поступлению в вуз. Задавай вопросы по одному, чтобы помочь пользователю определиться с выбором. Следуй схеме:
+
+Профессиональные интересы: «Какую сферу деятельности вы рассматриваете? Например, IT, медицина, инженерия» 
+Баллы ЕГЭ: «Какие экзамены вы сдаёте и какой примерный балл ожидаете?» 
+Локация: «В каком городе/регионе хотите учиться?»
+Бюджет/платное: «Вас интересуют бюджетные места или готовы рассмотреть платное обучение?»
+Дополнительно: «Важны ли стипендии, практики»""", memory=True)
+
 
 db.init_db()
 
 TRANS = {
     "russian": "Русский язык",
     "literature": "Литература",
-    "profmat": "Математика профиль",
-    "basemat": "Математика базовая",
+    "profmat": "Математика проф.",
+    "basemat": "Математика база",
     "chem": "Химия",
     "geo": "География",
     "obsh": "Обществознание",
@@ -47,27 +72,18 @@ TRANS = {
 #start
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message, state: FSMContext):
+    if db.check_subjects(message.from_user.id):
+        await message.answer(f"Твои возможности:", reply_markup=keyboards.main_menu_keyboard)
+        return await state.set_state(botstates.MainMenuStates.main)
     first_name = message.from_user.first_name
     await message.answer("Привет! Я — твой помощник в выборе вуза и подготовке к экзаменам. Давай начнём с короткой анкеты, чтобы я понял, как тебе помочь! 🎓\n\n Какие предметы ты сдаёшь? Когда выберешь, нажми 'Я выбрал'", reply_markup=keyboards.create_subjects())
     db.register_user(int(message.chat.id), first_name)
     await state.set_state(botstates.RegistrationStates.waiting_for_subjects)
 
-# get user in db
-@dp.message(lambda message: message.contact is not None)
-async def handle_contact(message: types.Message, state: FSMContext):
-    contact = message.contact
-    username = message.from_user.username if message.from_user.username else contact.phone_number
-    first_name = contact.first_name
-    second_name = contact.last_name if contact.last_name else ""
-    await state.update_data(
-        username=username,
-        first_name=first_name,
-        second_name=second_name,
-        phone_num=contact.phone_number,
-        userid=int(message.chat.id)
-    )
-    await message.answer("Спасибо! Какие предметы ты сдаёшь? Когда выберешь, нажми 'Я выбрал' ❓", reply_markup=keyboards.subjects)
-    db.register_user(int(message.chat.id), first_name)
+@dp.callback_query(lambda call: call.data == "edit_subjects")
+async def process_subjects(callback_query: types.CallbackQuery, state: FSMContext):
+    db.delete_subjects(callback_query.from_user.id)
+    await callback_query.message.edit_text("Привет! Я — твой помощник в выборе вуза и подготовке к экзаменам. Давай начнём с короткой анкеты, чтобы я понял, как тебе помочь! 🎓\n\n Какие предметы ты сдаёшь? Когда выберешь, нажми 'Я выбрал'", reply_markup=keyboards.create_subjects())
     await state.set_state(botstates.RegistrationStates.waiting_for_subjects)
 
 @dp.callback_query(botstates.RegistrationStates.waiting_for_subjects)
@@ -77,87 +93,140 @@ async def process_subjects(callback_query: types.CallbackQuery, state: FSMContex
     data_got["userid"] = callback_query.from_user.id
     if "subjects" not in data_got:
         data_got["subjects"] = []
-    if data == 'yes':
-        return await callback_query.answer("Уже выбрано!")
     if data != "done":
         if data in data_got["subjects"]:
-            return
-        data_got["subjects"].append(data)
-        await callback_query.answer(f"Вы выбрали: {TRANS[data]}")
+            data_got["subjects"].remove(data)
+            await callback_query.answer(f"Вы отменили выбор: {TRANS[data]}")
+        else:
+            data_got["subjects"].append(data)
+            await callback_query.answer(f"Вы выбрали: {TRANS[data]}")
+        if data in ["profmat", "basemat"]:
+            if data == "profmat" and "basemat" in data_got["subjects"]:
+                data_got["subjects"].remove("basemat")
+            elif data == "basemat" and "profmat" in data_got["subjects"]:
+                data_got["subjects"].remove("profmat")
         await callback_query.message.edit_text("Привет! Я — твой помощник в выборе вуза и подготовке к экзаменам. Давай начнём с короткой анкеты, чтобы я понял, как тебе помочь! 🎓\n\n Какие предметы ты сдаёшь? Когда выберешь, нажми 'Я выбрал'", reply_markup=keyboards.create_subjects(data_got["subjects"]))
     await state.update_data(data_got)
     if data=="done":
         db.register_subjects(data_got["userid"], data_got["subjects"])
         await callback_query.message.answer(f"Молодец! Пора приступать к подготовке", reply_markup=keyboards.main_menu_keyboard)
         await state.set_state(botstates.MainMenuStates.main)
+        await callback_query.message.delete()
 
-@dp.message(lambda message: message.text in ["Психолог👩🏻‍⚕️", "Аккаунт💳", "Помощь с выбором специальности✅"])
+@dp.message(lambda message: message.text in ["Помощь с расписанием🔒", "Помощь с составлением расписания🔒"])
 async def main_menu(message: types.Message, state: FSMContext):
-    if message.text == "Психолог👩🏻‍⚕️":
-        await message.answer("Опиши свою проблему и ИИ-ассистент окажет тебе моральную поддержку. Чтобы завершить сеанс психотерапии, напиши /stop")
+    await message.answer("Функция в разработке. . .")
+
+@dp.message(lambda message: message.text.lower() in ["психолог👩🏻‍⚕️", "аккаунт💳", "помощь с выбором специальности✅", "тренажёры🚀"])
+async def main_menu(message: types.Message, state: FSMContext):
+    if message.text.lower() == "психолог👩🏻‍⚕️":
+        msg = await message.answer("Создание модели...")
+        await create_physicol(message.from_user.id)
+        await msg.edit_text("Опиши свою проблему и ИИ-ассистент окажет тебе моральную поддержку. Чтобы завершить сеанс психотерапии, напиши /stop")
         await state.set_state(botstates.MainMenuStates.psycho)
 
-    if message.text == "Помощь с выбором специальности✅":
-        await message.answer("Чтобы мы смогли тебе подобрать специальность, нам нужно, чтобы ты ответил на некоторые вопросы")
-        await message.answer("Какая карьерная траектория вас больше привлекает?")
-        await state.set_state(botstates.Choice.q1)
+    if message.text.lower() == "тренажёры🚀":
+        await message.answer("🚀Выберите тренажёр из представленных", reply_markup=keyboards.tests_keyboard)
+        await state.set_state(botstates.MainMenuStates.tests)
+
+    if message.text.lower() == "помощь с выбором специальности✅":
+        await message.answer("""🌟 <b>Приветствуем в подборе специальности!</b> 🌟
+
+Чтобы мы могли подобрать для тебя идеальный вариант, нужно ответить на <b>7 простых вопросов</b>. 
+
+🚀 <b>Как это работает?</b>
+1. Отвечай на вопросы максимально честно
+2. Не задерживайся слишком долго над ответами
+3. Используй кнопки или текстовые ответы
+
+⚠️ <b>Хочешь прервать тест?</b>
+- Напиши "Стоп" для полного завершения
+- Или "Завершить" для моментального анализа
+
+Все данные обрабатываются анонимно и не сохраняются ✅
+
+Готов начать? Тогда поехали! 🚀""")
+        msg = await message.answer("Создание модели. . .")
+        await create_ai(message.from_user.id)
+        await msg.edit_text("Подбор вопроса. . .")
+        try:
+            await msg.edit_text(await ai[message.from_user.id].question(f"Человек ответил: {message.text}\nЗадай вопрос ему по инструкции"))
+        except Exception as e:
+            print(e)
+            await msg.edit_text("При генерации вопроса произошла ошибка на стороне YandexGPT")
+        await state.set_state(botstates.Choice.q)
     if message.text == "Аккаунт💳":
+        subjects_mass = db.get_subjects(message.from_user.id)
+        subjects = ""
+        for item in subjects_mass:
+            subjects += TRANS[item["subject"]] + ", "
+        subjects = subjects[:-2]
         await message.answer(f"""
-        🆔Ваш id telegram: {message.chat.id}
+        🆔Ваш id telegram: {message.from_user.id}
 ⭐️Информация о подписке:
  ├ Тип: Pro
  ├ Подписка оформлена: 2025-04-18
  ├ Действует до: 2025-05-18
  ├ Куплена по цене: 0⭐️/месяц
  └ Акция: Применялась
-        """)
+
+Выбранные вами предметы: {subjects}
+        """, reply_markup=keyboards.profile)
 
     if message.text in ["Тренажёры🔒", "Помощь с составлением расписания🔒", "Помощь с расписанием🔒"]:
         await message.answer("Ещё в разработке✅")
 
-@dp.message(botstates.Choice.q1)  # Используем message вместо callback_query
+@dp.message(botstates.MainMenuStates.tests)
+async def tests_choice(message: types.Message, state: FSMContext):
+    if message.text.lower() == "орфоэпия":
+        await state.set_state(botstates.Tests.rus_orfoepia)
+        word = test_utils.get_stress_word()
+        await message.answer("Напишите слово с правильно поставленным ударением, отметив ударение заглавной буквой: " + word.lower() 
+        + "\n Чтобы остановить тренажёр, напишите 'Стоп'")
+        await state.update_data(current_word=word)
+
+@dp.message(botstates.Tests.rus_orfoepia)
+async def rus_orfoepia_test(message: types.Message, state: FSMContext):
+    if message.text in STRESS_WORDS and message.text.lower() == state.get_data()["current_word"].lower():
+        word = test_utils.get_stress_word()
+        await message.answer(word.lower())
+    elif message.text.lower() == "стоп":
+        await state.set_state(botstates.MainMenuStates.main)
+        await message.answer("Тестирование окончено", reply_markup=keyboards.main_menu_keyboard)
+    else:
+        word = test_utils.get_stress_word()
+        cword = state.get_data["current_word"]
+        await message.answer(f"Неверно! Правильное написание: {cword}\n Следующее слово: " + word.lower())
+        
+
+@dp.message(botstates.Choice.q)  # Используем message вместо callback_query
 async def choice1(message: types.Message, state: FSMContext):
-    data_got = await state.get_data()
-    data_got["q1"] = message.text
-    await message.answer("К чему у вас были способности в школе? Если затрудняетесь ответить, вспомните слова окружающих или предположите.")
-    await state.update_data(data_got)
-    await state.set_state(botstates.Choice.q2)
+    if message.text.lower() == "стоп":
+        await state.set_state(botstates.MainMenuStates.main)
+        return await message.answer("Обработка остановлена!")
+    if message.text.lower() == "завершить":
+        return await askainow(message, state)
+    msg = await message.answer("Подбор вопроса. . .")
+    if ai[message.from_user.id].message_count >= 6:
+        await state.set_state(botstates.Choice.AskAI)
+    try:
+        await msg.edit_text(await ai[message.from_user.id].question(f"Человек ответил: {message.text}\nЗадай вопрос ему по инструкции"))
+    except Exception as e:
+        print(e)
+        await msg.edit_text("При генерации вопроса произошла ошибка на стороне YandexGPT")
 
-@dp.message(botstates.Choice.q2)  # Используем message вместо callback_query
-async def choice2(message: types.Message, state: FSMContext):
-    data_got = await state.get_data()
-    data_got["q2"] = message.text
-    await message.answer("В каких сферах у вас есть практический опыт, о котором приятно вспомнить?")
-    await state.update_data(data_got)
-    await state.set_state(botstates.Choice.q3)
-
-@dp.message(botstates.Choice.q3)  # Используем message вместо callback_query
-async def choice3(message: types.Message, state: FSMContext):
-    data_got = await state.get_data()
-    data_got["q3"] = message.text
-    await message.answer("Подожди, когда ИИ подберет тебе специальности мечты!")
-    await state.update_data(data_got)
-    await state.set_state(botstates.Choice.AskAI)
-    await askainow(message, state)  # Явно вызываем следующую функцию
 
 @dp.message(botstates.Choice.AskAI)
 async def askainow(message: types.Message, state:FSMContext):
-    data_got = await state.get_data()
-    data_got["q3"] = message.text
-    a1 = data_got["q1"]
-    a2 = data_got["q2"]
-    a3 = data_got["q3"]
-    got = f"""
-    Какая карьерная траектория вас больше привлекает?
-    Ответ: {a1}
-    К чему у вас были способности в школе? Если затрудняетесь ответить, вспомните слова окружающих или предположите.
-    Ответ: {a2}
-    В каких сферах у вас есть практический опыт, о котором приятно вспомнить?
-    Ответ: {a3}
-    """ 
-    answer = ai.question(got)
-
-    await message.answer(answer)
+    msg = await message.answer("Анализ ответов...")
+    subjects_mass = db.get_subjects(message.from_user.id)
+    subjects = ""
+    for item in subjects_mass:
+        subjects += TRANS[item["subject"]] + ", "
+    subjects = subjects[:-2]
+    answer = await ai[message.from_user.id].question(f"Человек ответил: {message.text}. Также информация о предметах человека: {subjects}. Всё, выдай результат, какие вузы подходят.",
+                               "llama")
+    await msg.edit_text(answer)
     await message.answer("Если у тебя будет вопросы по этой теме, задай их психологу", reply_markup=keyboards.main_menu_keyboard)
     await state.set_state(botstates.MainMenuStates.main)
 
@@ -168,10 +237,12 @@ async def psycho(message: types.Message, state: FSMContext):
         await message.answer("Сеанс закончен", reply_markup=keyboards.main_menu_keyboard)
         await state.set_state(botstates.MainMenuStates.main)
     else:
+        msg = await message.answer("Обдумываю ваш запрос. . .")
         try:
-            await message.answer(psycho_ai.user_ask(message.text))
+            await msg.edit_text(await psycho_ai[message.from_user.id].user_ask(message.text))
         except:
             await message.answer("Ваш запрос не прошёл цензуру, простите")
+
 
 
 
