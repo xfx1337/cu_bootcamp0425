@@ -17,6 +17,7 @@ import keyboards
 from ai.yandex_ai import Psychologist, Analyzer
 
 import test_utils
+from test_utils import STRESS_WORDS
 
 
 load_dotenv()
@@ -181,22 +182,33 @@ async def tests_choice(message: types.Message, state: FSMContext):
     if message.text.lower() == "орфоэпия":
         await state.set_state(botstates.Tests.rus_orfoepia)
         word = test_utils.get_stress_word()
-        await message.answer("Напишите слово с правильно поставленным ударением, отметив ударение заглавной буквой: " + word.lower() 
-        + "\n Чтобы остановить тренажёр, напишите 'Стоп'")
+        await message.answer("Напишите слово с правильно поставленным ударением, отметив ударение заглавной буквой: \n\n" + word.lower() 
+        + "\n\n Чтобы остановить тренажёр, напишите 'Стоп'")
         await state.update_data(current_word=word)
+    else:
+        await state.set_state(botstates.MainMenuStates.main)
+        await message.answer("Ещё в разработке✅", reply_markup=keyboards.main_menu_keyboard)
 
 @dp.message(botstates.Tests.rus_orfoepia)
 async def rus_orfoepia_test(message: types.Message, state: FSMContext):
-    if message.text in STRESS_WORDS and message.text.lower() == state.get_data()["current_word"].lower():
+    data = await state.get_data()
+    if message.text == None:
         word = test_utils.get_stress_word()
-        await message.answer(word.lower())
+        cword = data["current_word"]
+        await message.answer(f"Неверно! Правильное написание: {cword}\n Следующее слово: " + word.lower())
+        return
+    if message.text in STRESS_WORDS and message.text.lower() == data["current_word"].lower():
+        word = test_utils.get_stress_word()
+        await message.answer("Верно! \n Следующее слово: " + word.lower())
     elif message.text.lower() == "стоп":
         await state.set_state(botstates.MainMenuStates.main)
         await message.answer("Тестирование окончено", reply_markup=keyboards.main_menu_keyboard)
     else:
         word = test_utils.get_stress_word()
-        cword = state.get_data["current_word"]
+        cword = data["current_word"]
         await message.answer(f"Неверно! Правильное написание: {cword}\n Следующее слово: " + word.lower())
+    data["current_word"] = word
+    await state.update_data(data)
         
 
 @dp.message(botstates.Choice.q)  # Используем message вместо callback_query
