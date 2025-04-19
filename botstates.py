@@ -9,6 +9,7 @@ class MainMenuStates(StatesGroup):
     main = State()
     psycho = State()
     tests = State()
+    daily_help = State()
 
 class Choice(StatesGroup):
     q = State()

@@ -123,7 +123,7 @@ async def process_subjects(callback_query: types.CallbackQuery, state: FSMContex
 async def main_menu(message: types.Message, state: FSMContext):
     await message.answer("Функция в разработке. . .")
 
-@dp.message(lambda message: message.text.lower() in ["психолог👩🏻‍⚕️", "аккаунт💳", "помощь с выбором специальности✅", "тренажёры🚀"])
+@dp.message(lambda message: message.text.lower() in ["психолог👩🏻‍⚕️", "аккаунт💳", "помощь с выбором специальности✅", "тренажёры🚀", "помощь с составлением расписания📅"])
 async def main_menu(message: types.Message, state: FSMContext):
     if message.text.lower() == "психолог👩🏻‍⚕️":
         msg = await message.answer("Создание модели...")
@@ -182,6 +182,26 @@ async def main_menu(message: types.Message, state: FSMContext):
     if message.text in ["Тренажёры🔒", "Помощь с составлением расписания🔒", "Помощь с расписанием🔒"]:
         await message.answer("Ещё в разработке✅")
 
+    if message.text == "Помощь с составлением расписания📅":
+        await message.answer("""
+Расскажи, во сколько в среднем ты тратишь времени на поездку от школы до дома, во сколько хочешь ложиться спать и сколько времени ты хочешь тратить на каждый предмет в неделю.")
+
+Пример:
+Я хочу заниматься математикой 3 часа в неделю, 7 часов русским, 4 информатикой. Я заканчиваю обучение в школе в 15:00, еду домой час. Я ложусь в 12 ночи.
+
+""")
+        await state.set_state(botstates.MainMenuStates.daily_help)
+
+@dp.message(botstates.MainMenuStates.daily_help)
+async def get_daily_help(message: types.Message, state: FSMContext):
+    await message.answer("Подожди ответа ИИ")
+    aiDaily = await Analyzer().init("Представь, что ты школьный преподаватель и должен составить мне расписание обучения. Я учусь в школе до определённого времени каждый день, но мне надо готовиться к экзаменами. Я укажу сколько часов мне на это требуется за неделю. Твоя задача распределить. Также я ложусь в определённое время и трачу определённое время на дорогу домой. ",base=False)
+    answer = await aiDaily.question(message.text)
+    await message.answer(answer)
+    await message.answer("Возвращаю вас в главное меню✅")
+    await state.set_state(botstates.MainMenuStates.main)
+
+
 @dp.message(botstates.MainMenuStates.tests)
 async def tests_choice(message: types.Message, state: FSMContext):
     if message.text.lower() == "орфоэпия":
@@ -212,7 +232,7 @@ async def rus_orfoepia_test(message: types.Message, state: FSMContext):
         await message.answer(f"Неверно! Правильное написание: {cword}\n Следующее слово: " + word.lower())
     data["current_word"] = word
     await state.update_data(data)
-        
+    
 
 @dp.message(botstates.Choice.q)  # Используем message вместо callback_query
 async def choice1(message: types.Message, state: FSMContext):
