@@ -5,6 +5,12 @@ from yandex_cloud_ml_sdk.search_indexes import TextSearchIndexType
 import os, time
 import random
 import aiofiles  # Для асинхронной работы с файлами
+import tiktoken
+enc = tiktoken.encoding_for_model("yandexgpt")
+
+def count_tokens(text):
+    return len(enc.encode(text))
+
 
 load_dotenv()
 

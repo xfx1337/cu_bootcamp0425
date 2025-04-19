@@ -237,6 +237,7 @@ async def psycho(message: types.Message, state: FSMContext):
         await message.answer("Сеанс закончен", reply_markup=keyboards.main_menu_keyboard)
         await state.set_state(botstates.MainMenuStates.main)
     else:
+        print(ai.memory)
         msg = await message.answer("Обдумываю ваш запрос. . .")
         try:
             await msg.edit_text(await psycho_ai[message.from_user.id].user_ask(message.text))
