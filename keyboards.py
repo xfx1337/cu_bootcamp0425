@@ -5,7 +5,7 @@ main_menu_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="Тренажёры🚀"), KeyboardButton(text="Помощь с составлением расписания🔒")],
         [KeyboardButton(text="Психолог👩🏻‍⚕️"), KeyboardButton(text="Помощь с выбором специальности✅")],
-        [KeyboardButton(text="Помощь с расписанием🔒"), KeyboardButton(text="Аккаунт💳")]
+        [KeyboardButton(text="Аккаунт💳")]
     ],
     resize_keyboard=True,
     one_time_keyboard=True
