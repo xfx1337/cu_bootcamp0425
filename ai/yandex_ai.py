@@ -5,8 +5,6 @@ from yandex_cloud_ml_sdk.search_indexes import TextSearchIndexType
 import os, time
 import random
 import aiofiles  # Для асинхронной работы с файлами
-import tiktoken
-enc = tiktoken.encoding_for_model("yandexgpt")
 
 def count_tokens(text):
     return len(enc.encode(text))
@@ -56,8 +54,10 @@ class Analyzer:
         """Асинхронный вопрос к модели"""
         self.message_count += 1
         if self.base:
-            return await self.question_base(query, model)
-        return await self.question_prepared_text(query)
+            answ = await self.question_base(query, model)
+        else:
+            answ = await self.question_prepared_text(query)
+        return answ
 
     async def question_prepared_text(self, query):
         assistant = await sdk.assistants.get(self.id_model)  # Асинхронное получение ассистента

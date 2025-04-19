@@ -59,4 +59,5 @@ def create_subjects(data=[]):
     return subjects
 
 profile = InlineKeyboardMarkup(
-    inline_keyboard=[[InlineKeyboardButton(text="♻️Сменить предметы", callback_data="edit_subjects")]])
+    inline_keyboard=[[InlineKeyboardButton(text="♻️Сменить предметы", callback_data="edit_subjects")],
+                     [InlineKeyboardButton(text="🌟Продлить подписку", callback_data="subscription")]])

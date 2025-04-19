@@ -27,6 +27,7 @@ if not BOT_TOKEN:
     raise ValueError("Токен не найден! Проверьте .env файл.")
 
 from create_bot import bot, dp
+from aiogram import types
 
 psycho_ai = {}
 ai = {}
@@ -80,6 +81,10 @@ async def send_welcome(message: types.Message, state: FSMContext):
     await message.answer("Привет! Я — твой помощник в выборе вуза и подготовке к экзаменам. Давай начнём с короткой анкеты, чтобы я понял, как тебе помочь! 🎓\n\n Какие предметы ты сдаёшь? Когда выберешь, нажми 'Я выбрал'", reply_markup=keyboards.create_subjects())
     db.register_user(int(message.chat.id), first_name)
     await state.set_state(botstates.RegistrationStates.waiting_for_subjects)
+
+@dp.callback_query(lambda call: call.data == "subscription")
+async def process_subjects(callback_query: types.CallbackQuery, state: FSMContext):
+    await callback_query.answer("Сегодня в честь ЭКСПО - подписка бесплатная и её нельзя продлить. Всё ради вас💘", True)
 
 @dp.callback_query(lambda call: call.data == "edit_subjects")
 async def process_subjects(callback_query: types.CallbackQuery, state: FSMContext):
@@ -166,8 +171,8 @@ async def main_menu(message: types.Message, state: FSMContext):
         🆔Ваш id telegram: {message.from_user.id}
 ⭐️Информация о подписке:
  ├ Тип: Pro
- ├ Подписка оформлена: 2025-04-18
- ├ Действует до: 2025-05-18
+ ├ Подписка оформлена: 19.04.2025
+ ├ Действует до: 20.04.2025
  ├ Куплена по цене: 0⭐️/месяц
  └ Акция: Применялась
 
@@ -192,19 +197,17 @@ async def tests_choice(message: types.Message, state: FSMContext):
 @dp.message(botstates.Tests.rus_orfoepia)
 async def rus_orfoepia_test(message: types.Message, state: FSMContext):
     data = await state.get_data()
+    word = test_utils.get_stress_word()
     if message.text == None:
-        word = test_utils.get_stress_word()
         cword = data["current_word"]
-        await message.answer(f"Неверно! Правильное написание: {cword}\n Следующее слово: " + word.lower())
+        await message.answer(f"Неверно! Правильное написание: <b>{cword}</b>\n Следующее слово: <b>" + word.lower() + "</b>")
         return
     if message.text in STRESS_WORDS and message.text.lower() == data["current_word"].lower():
-        word = test_utils.get_stress_word()
         await message.answer("Верно! \n Следующее слово: " + word.lower())
     elif message.text.lower() == "стоп":
         await state.set_state(botstates.MainMenuStates.main)
         await message.answer("Тестирование окончено", reply_markup=keyboards.main_menu_keyboard)
     else:
-        word = test_utils.get_stress_word()
         cword = data["current_word"]
         await message.answer(f"Неверно! Правильное написание: {cword}\n Следующее слово: " + word.lower())
     data["current_word"] = word
@@ -249,7 +252,6 @@ async def psycho(message: types.Message, state: FSMContext):
         await message.answer("Сеанс закончен", reply_markup=keyboards.main_menu_keyboard)
         await state.set_state(botstates.MainMenuStates.main)
     else:
-        print(ai.memory)
         msg = await message.answer("Обдумываю ваш запрос. . .")
         try:
             await msg.edit_text(await psycho_ai[message.from_user.id].user_ask(message.text))
