@@ -17,3 +17,6 @@ class Choice(StatesGroup):
 
 class Tests(StatesGroup):
     rus_orfoepia = State()
+
+class Wait(StatesGroup):
+    wait_generation = State()

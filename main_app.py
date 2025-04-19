@@ -123,7 +123,7 @@ async def process_subjects(callback_query: types.CallbackQuery, state: FSMContex
 async def main_menu(message: types.Message, state: FSMContext):
     await message.answer("Функция в разработке. . .")
 
-@dp.message(lambda message: message.text.lower() in ["психолог👩🏻‍⚕️", "аккаунт💳", "помощь с выбором специальности✅", "тренажёры🚀", "помощь с составлением расписания📅"])
+@dp.message(lambda message: message.text.lower() in ["психолог👩🏻‍⚕️", "аккаунт💳", "помощь с выбором специальности✅", "тренажёры🚀", "помощь с расписанием📅"])
 async def main_menu(message: types.Message, state: FSMContext):
     if message.text.lower() == "психолог👩🏻‍⚕️":
         msg = await message.answer("Создание модели...")
@@ -182,7 +182,7 @@ async def main_menu(message: types.Message, state: FSMContext):
     if message.text in ["Тренажёры🔒", "Помощь с составлением расписания🔒", "Помощь с расписанием🔒"]:
         await message.answer("Ещё в разработке✅")
 
-    if message.text == "Помощь с составлением расписания📅":
+    if message.text == "Помощь с расписанием📅":
         await message.answer("""
 Расскажи, во сколько в среднем ты тратишь времени на поездку от школы до дома, во сколько хочешь ложиться спать и сколько времени ты хочешь тратить на каждый предмет в неделю.")
 
@@ -234,6 +234,11 @@ async def rus_orfoepia_test(message: types.Message, state: FSMContext):
     await state.update_data(data)
     
 
+@dp.message(botstates.Choice.q) 
+async def choice1(message: types.Message, state: FSMContext):
+    return await message.answer("Ожидайте завершения генерации ответа")
+
+
 @dp.message(botstates.Choice.q)  # Используем message вместо callback_query
 async def choice1(message: types.Message, state: FSMContext):
     if message.text.lower() == "стоп":
@@ -241,18 +246,21 @@ async def choice1(message: types.Message, state: FSMContext):
         return await message.answer("Обработка остановлена!")
     if message.text.lower() == "завершить":
         return await askainow(message, state)
+    await state.set_state(botstates.Wait.wait_generation)
     msg = await message.answer("Подбор вопроса. . .")
-    if ai[message.from_user.id].message_count >= 6:
-        await state.set_state(botstates.Choice.AskAI)
     try:
         await msg.edit_text(await ai[message.from_user.id].question(f"Человек ответил: {message.text}\nЗадай вопрос ему по инструкции"))
     except Exception as e:
         print(e)
         await msg.edit_text("При генерации вопроса произошла ошибка на стороне YandexGPT")
+    await state.set_state(botstates.Choice.q)
+    if ai[message.from_user.id].message_count >= 6:
+        await state.set_state(botstates.Choice.AskAI)
 
 
 @dp.message(botstates.Choice.AskAI)
 async def askainow(message: types.Message, state:FSMContext):
+    await state.set_state(botstates.MainMenuStates.main)
     msg = await message.answer("Анализ ответов...")
     subjects_mass = db.get_subjects(message.from_user.id)
     subjects = ""
@@ -263,7 +271,6 @@ async def askainow(message: types.Message, state:FSMContext):
                                "llama")
     await msg.edit_text(answer)
     await message.answer("Если у тебя будет вопросы по этой теме, задай их психологу", reply_markup=keyboards.main_menu_keyboard)
-    await state.set_state(botstates.MainMenuStates.main)
 
 
 @dp.message(botstates.MainMenuStates.psycho)  # Используем message вместо callback_query
@@ -272,7 +279,9 @@ async def psycho(message: types.Message, state: FSMContext):
         await message.answer("Сеанс закончен", reply_markup=keyboards.main_menu_keyboard)
         await state.set_state(botstates.MainMenuStates.main)
     else:
+        await state.set_state(botstates.Wait.wait_generation)
         msg = await message.answer("Обдумываю ваш запрос. . .")
+        await state.set_state(botstates.MainMenuStates.psycho)
         try:
             await msg.edit_text(await psycho_ai[message.from_user.id].user_ask(message.text))
         except:
